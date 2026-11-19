@@ -1,3 +1,4 @@
+import hashlib
 import os
 import shutil
 
@@ -22,4 +23,14 @@ shutil.copyfile(src, out)
 # The copy must be exact: the judge sees exactly these bytes.
 if os.path.getsize(out) != os.path.getsize(src):
     raise SystemExit("entry.png copy is incomplete")
+# A size-only check cannot catch a same-size corrupted copy, so verify the
+# content too: the SHA-256 of the copy must match the source exactly.
+def _sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+if _sha256(out) != _sha256(src):
+    raise SystemExit("entry.png copy is corrupted")
 print("wrote", out, os.path.getsize(out), "bytes")
