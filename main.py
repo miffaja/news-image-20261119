@@ -1,36 +1,61 @@
+#!/usr/bin/env python3
+"""Publish the news-image-20261119 entry image.
+
+The entry is a newspaper front page summing up Thursday
+19 November 2026 in 35 stories, stored as entry.png next to
+this script. This program copies that image into the make.fun
+output directory and checks the copy is byte-for-byte identical
+(size and SHA-256) before declaring success.
+"""
+
 import hashlib
 import os
 import shutil
+import sys
 
-# A working news-image-20261119 entry (Python 3.13, standard library only):
-# its image is the entry.png beside this file, and the program copies it to
-# /output/entry.png. The image is a newspaper front page summing up the
-# world's news of Thursday 19 November 2026 in the leaderboard formula:
-# 35 stories, two lead cards, ten featured cards, a colour-coded world map,
-# and a BY THE NUMBERS strip: tankers burning in Hormuz, the Trump-Xi-Putin
-# trilateral in Shenzhen, the ICJ Rohingya ruling, a $190.4m Van Gogh, and
-# Cyclone Akvan bearing down on India's east coast.
-# The gate takes a whole PNG or JPEG of at most 1 MiB and 1024 by 1024
-# pixels, and the judge sees exactly the bytes copied.
-#
-# Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-#   mkdir -p out && MAKEFUN_OUTPUT_DIR=out python3 main.py
+BLOCK = 1024 * 1024
 
-src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "entry.png")
-out = os.path.join(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"), "entry.png")
-os.makedirs(os.path.dirname(out), exist_ok=True)
-shutil.copyfile(src, out)
-# The copy must be exact: the judge sees exactly these bytes.
-if os.path.getsize(out) != os.path.getsize(src):
-    raise SystemExit("entry.png copy is incomplete")
-# A size-only check cannot catch a same-size corrupted copy, so verify the
-# content too: the SHA-256 of the copy must match the source exactly.
-def _sha256(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            h.update(chunk)
-    return h.hexdigest()
-if _sha256(out) != _sha256(src):
-    raise SystemExit("entry.png copy is corrupted")
-print("wrote", out, os.path.getsize(out), "bytes")
+
+def digest(path):
+    """SHA-256 of a file, read in blocks so large files stay cheap."""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as handle:
+        while True:
+            block = handle.read(BLOCK)
+            if not block:
+                break
+            hasher.update(block)
+    return hasher.hexdigest()
+
+
+def fail(message):
+    print("error: " + message, file=sys.stderr)
+    sys.exit(1)
+
+
+def main():
+    here = os.path.dirname(os.path.abspath(__file__))
+    source = os.path.join(here, "entry.png")
+
+    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR") or "/output"
+    os.makedirs(out_dir, exist_ok=True)
+    target = os.path.join(out_dir, "entry.png")
+
+    shutil.copyfile(source, target)
+
+    expected_size = os.path.getsize(source)
+    copied_size = os.path.getsize(target)
+    if copied_size != expected_size:
+        fail(
+            "size mismatch for %s: got %d bytes, expected %d bytes"
+            % (target, copied_size, expected_size)
+        )
+
+    if digest(target) != digest(source):
+        fail("sha256 mismatch for %s: copy differs from %s" % (target, source))
+
+    print("wrote %s (%d bytes)" % (target, copied_size))
+
+
+if __name__ == "__main__":
+    main()
