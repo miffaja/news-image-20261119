@@ -37,6 +37,13 @@ def main():
     here = os.path.dirname(os.path.abspath(__file__))
     source = os.path.join(here, "entry.png")
 
+    # The entry must be a PNG: refuse anything whose first bytes are not
+    # the PNG signature, instead of copying and hashing unknown data.
+    with open(source, "rb") as handle:
+        signature = handle.read(8)
+    if signature != b"\x89PNG\r\n\x1a\n":
+        fail("entry.png is not a valid PNG: bad signature")
+
     out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR") or "/output"
     os.makedirs(out_dir, exist_ok=True)
     target = os.path.join(out_dir, "entry.png")
