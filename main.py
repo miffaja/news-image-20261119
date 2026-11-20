@@ -15,6 +15,11 @@ import sys
 
 BLOCK = 1024 * 1024
 
+# The entry image this program publishes, pinned by size and SHA-256 so a
+# swapped or truncated entry.png is refused instead of published.
+EXPECTED_SIZE = 148733
+EXPECTED_SHA256 = "e7ba2b932ad67032c83b0f8247020a5b85036ea59d50856117543bfb9fee062c"
+
 
 def digest(path):
     """SHA-256 of a file, read in blocks so large files stay cheap."""
@@ -43,6 +48,18 @@ def main():
         signature = handle.read(8)
     if signature != b"\x89PNG\r\n\x1a\n":
         fail("entry.png is not a valid PNG: bad signature")
+
+    # The entry must be the exact image pinned above: refuse any other
+    # size or digest rather than publishing the wrong front page.
+    source_size = os.path.getsize(source)
+    if source_size != EXPECTED_SIZE:
+        fail(
+            "entry.png size mismatch: got %d bytes, expected %d bytes"
+            % (source_size, EXPECTED_SIZE)
+        )
+    source_digest = digest(source)
+    if source_digest != EXPECTED_SHA256:
+        fail("entry.png sha256 mismatch: got %s, expected %s" % (source_digest, EXPECTED_SHA256))
 
     out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR") or "/output"
     os.makedirs(out_dir, exist_ok=True)
